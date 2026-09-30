@@ -1,0 +1,57 @@
+{
+  "_comment": "Copy to profile.json and fill in. Every registration form answer comes from here. A null fact means 'I don't know' — questions that need it are left for you (NEEDS-HUMAN) instead of guessed.",
+
+  "email": "you@example.com",
+  "first": "Ada",
+  "last": "Lovelace",
+  "phone": "+14155550123",
+  "company": "Analytical Engines",
+  "title": "Founder",
+  "linkedin": "/in/ada-lovelace",
+  "website": "https://example.com",
+  "github": "adalovelace",
+  "twitter": "adalovelace",
+  "instagram": null,
+  "discord": null,
+  "city": "San Francisco",
+  "zip": null,
+  "country": "United States",
+
+  "blurb": "Building Analytical Engines, an early-stage AI startup (example.com). Keen to meet founders, builders and investors.",
+
+  "facts": {
+    "_comment": "Used for screening questions. Strings are matched against the form's own options, so write them the way a form would (e.g. '2-10', 'Seed', 'Delaware C-Corp').",
+    "isFounder": true,
+    "isStudent": false,
+    "isInvestor": false,
+    "fullTime": true,
+    "stage": "Seed",
+    "companySize": "2-10",
+    "entityType": null,
+    "yc": false,
+    "ycBatch": null,
+    "raising": true,
+    "totalRaised": null,
+    "lastRoundDate": null,
+    "revenue": null,
+    "fundingType": null,
+    "hiring": null,
+    "industry": "AI",
+    "expertise": "AI / software",
+    "age": null,
+    "gender": null,
+    "pronouns": null,
+    "education": null,
+    "dietary": "None",
+    "citizenship": null
+  },
+
+  "policy": {
+    "_comment": "What the bot may say yes to on your behalf.",
+    "agreeToTerms": true,
+    "joinCommunities": true,
+    "bringGuest": false,
+    "speakOrPitch": false,
+    "vendorDemos": false
+  }
+}

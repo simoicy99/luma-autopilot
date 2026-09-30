@@ -1,0 +1,1 @@
+Nightly Luma registration run. Read .claude/skills/luma-autopilot/SKILL.md in this repo and follow it exactly, start to finish. Do not skip the dry-run review and do not register for anything the skill says to leave for the human.

@@ -1,0 +1,46 @@
+{
+  "_comment": "Copy to config.json. Where you are, what you want, and how the nightly run behaves.",
+
+  "timezone": "America/Los_Angeles",
+  "cities": [
+    "San Francisco", "Oakland", "Berkeley", "Emeryville", "Alameda",
+    "South San Francisco", "Daly City", "San Mateo", "Burlingame", "Foster City",
+    "Redwood City", "Menlo Park", "Palo Alto", "Mountain View", "Sunnyvale",
+    "Santa Clara", "San Jose", "Cupertino", "Los Altos"
+  ],
+  "regionWords": ["san francisco", "sf", "bay area", "california"],
+  "outOfRegionCities": [
+    "Seattle", "Bellevue", "Redmond", "Kirkland", "Portland", "Los Angeles",
+    "San Diego", "Las Vegas", "Denver", "Phoenix", "Austin", "Vancouver", "Sacramento"
+  ],
+
+  "daysAhead": 21,
+  "maxPerNight": 80,
+
+  "keywords": [
+    "founders dinner", "founder dinner", "founders", "investors", "VC", "angel investors",
+    "demo day", "pitch night", "fireside chat", "AI", "agents", "agentic", "LLM",
+    "machine learning", "AI infra", "developer", "hackathon", "build night",
+    "open source", "seed", "pre-seed", "series A", "GTM", "B2B SaaS",
+    "YC", "a16z", "Sequoia", "OpenAI", "Anthropic", "robotics", "hardware",
+    "tech week", "afterparty", "launch party", "startup", "roundtable", "salon"
+  ],
+
+  "highSignalOnly": true,
+  "skipWomenFocused": true,
+  "skipNonLatinTitles": true,
+  "noOnline": true,
+  "noPaid": true,
+  "skipTitlePatterns": [
+    "office hours\\s*@", "reading club", "book club", "writing club", "silent reading",
+    "write-in", "phone[- ]free", "canvass", "voter outreach", "farmers market", "\\byoga\\b",
+    "run club", "hike", "meditation", "breathwork", "sound bath", "salsa", "bachata",
+    "pilates", "fitness", "\\bkids?\\b", "toddler", "church", "worship", "language exchange",
+    "board game", "volunteer", "cleanup", "wine tasting", "comedy", "karaoke", "improv",
+    "open mic", "pottery", "ceramics", "knit", "choir", "protest", "rally", "\\bmarch\\b"
+  ],
+  "skipSlugs": [],
+
+  "schedule": { "hour": 23, "minute": 0 },
+  "claudeModel": ""
+}

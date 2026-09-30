@@ -1,0 +1,11 @@
+# Your personal data — never commit these
+profile.json
+config.json
+
+# Runtime state, logs, queues
+state/*
+!state/.gitkeep
+
+# OS / editor
+.DS_Store
+node_modules/
