@@ -61,6 +61,39 @@
   const OUT_CITY = (CFG.outOfRegionCities || []).length ? new RegExp('\\b(' + CFG.outOfRegionCities.join('|') + ')\\b', 'i') : /$^/;
   const REGION = new RegExp((CFG.regionWords || [P.city]).map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|'), 'i');
 
+  // ---------- membership ----------
+  // Whether you CURRENTLY belong to a group is a claim the profile has no fact for. Questions
+  // these patterns recognize get no answer: a required one becomes NEEDS-HUMAN, an optional one
+  // is left blank. A recognized PROSPECTIVE question ("would you like to join our community?")
+  // is a preference, answered from policy.joinCommunities using only options that do not state
+  // a membership status. These are label/option regexes, not a general language model.
+  const NOT_MEMBERSHIP = /\b(team|staff|family|crew|board|committee|founding|cast|panel)[- ]?members?\b/g;
+  const MEMBERSHIP = /\bmembers?\b|\bmembership|alumn|affiliat|belong(s|ing)? to|\bassociat(ed|ion)\b|part of (?:the |our |a |an |any |this )?[\w'& -]{0,30}?\b(community|group|club|network|program|cohort|accelerator|organi[sz]ation|society|chapter|fellowship|collective)/;
+  const CURRENT_ASK = /\balready\b|\b(current|existing)(ly)?\b|\bare you (a |an )?(\w+ ){0,3}(members?|alumn\w*|affiliat\w*|part of)|\bwere you\b|\bmember(ship)? (id|number|status|level|tier|since)\b|\bnon-?members?\b|\byour (membership|affiliation)|which [^?]*\b(are you|do you belong)|\bdo you belong|\bhave you been\b/;
+  const JOIN_INTENT = /\b(would you like|do you want|want|like|interested|keen|happy|open) (in |to )(join|becom|be added|be part|subscrib)|\b(join|joining) (our|the|this)\b|\bbecome a member|\bsign (me )?up\b|\bopt[- ]?in\b/;
+  // Lowercase, straighten curly quotes (I’m → i'm), collapse whitespace.
+  const plain = (s) => String(s).toLowerCase().replace(/[‘’ʼ`´]/g, "'").replace(/\s+/g, ' ').trim();
+  // 'current' | 'prospective' | null (not a membership question).
+  const membershipKind = (L) => {
+    const l = plain(L).replace(NOT_MEMBERSHIP, ' ');
+    if (!MEMBERSHIP.test(l)) return null;
+    if (CURRENT_ASK.test(l)) return 'current';
+    if (JOIN_INTENT.test(l)) return 'prospective';
+    return 'current';
+  };
+  // Conservative: an option states a membership status (and is never used as consent to join)
+  // if it says already/current/existing, or mentions member/alumni/part of/belong at all,
+  // unless that mention is about becoming one ("Yes, I'd like to become a member").
+  // "Yes, I’m a member", "Yes, a member" and "Not a member yet" all count as statements.
+  const statesMembership = (o) => {
+    const s = plain(o);
+    if (/\balready\b|\bcurrent(ly)?\b|\bexisting\b/.test(s)) return true;
+    return /\bmembers?\b|\bmembership\b|\balum\w*|\bpart of\b|\bbelong/.test(s) && !/\b(become|becoming|join|joining)\b|\bsign (me )?up\b/.test(s);
+  };
+  // Text fields that ask for your employer, matched on the whole label (not a substring), so
+  // "Are you a member of our organization?" is still a membership question.
+  const EMPLOYER_FIELD = /^(company|organi[sz]ation|employer|(professional|company) affiliation)$/;
+
   // ---------- read an event page ----------
   async function rd(slug) {
     for (let a = 0; a < 4; a++) {
@@ -94,17 +127,27 @@
   };
   const yesNo = (opts, v) => v == null ? null : (v ? pick(opts, [/^yes\b/i]) : pick(opts, [/^no\b|^n\/?a\b|not /i]));
 
+  // Prospective "join us?" answer from policy. Options that claim existing membership are never
+  // candidates; if no honest option fits, null leaves it for the human.
+  const joinAnswer = (opts) => {
+    const ok = opts.filter((o) => !statesMembership(o));
+    return POL('joinCommunities', true)
+      ? pick(ok, [/^yes\b|^sure\b|\bok\b|count me in|sign me up|add me/i, /maybe/i])
+      : pick(ok, [/^no\b|not now|no thanks|not interested/i]);
+  };
+
+  // Every question goes through the rules below, including single-option ones: a lone option
+  // is not consent to whatever it says.
   function ansOpt(L, opts, multiple) {
-    if (opts.length === 1) return opts[0];
     const many = (arr) => { const a = arr.filter(Boolean); return a.length ? (multiple ? a : a[0]) : null; };
-    if (/affiliation/.test(L)) { const o = pick(opts, [/^n\/?a\b|no affiliation|not affiliated|^none\b/i]); if (o) return o; }
     if (/like to present|to present\??|present your|open to presenting/.test(L)) return POL('speakOrPitch', false) ? pick(opts, [/^yes\b/i]) : pick(opts, [/^no\b|not this time|not (interested|now)/i]);
     if (/expect to stay|stay for the/.test(L)) return pick(opts, [/maybe/i, /^yes\b/i]);
     if (/date of birth|\bdob\b/.test(L)) return null;
     if (/ai spend|spend per month|monthly spend|api usage|\bbudget\b/.test(L)) return null;
     if (/company size|number of employees|employees|headcount|how many people (work|are (at|in) your company)/.test(L)) return containsFact(opts, F('companySize'));
     if (/\bage\b|age range|how old/.test(L) && !/stage/.test(L)) return rangeFor(opts, F('age'));
-    if (/y ?combinator|\byc\b/.test(L)) return F('yc') ? (containsFact(opts, F('ycBatch')) || pick(opts, [/^yes\b/i])) : pick(opts, [/^n\/?a\b|not (a )?yc|^no\b|none/i]);
+    if (/y ?combinator|\byc\b/.test(L)) return F('yc') == null ? null : F('yc') ? (containsFact(opts, F('ycBatch')) || pick(opts, [/^yes\b/i])) : pick(opts, [/^n\/?a\b|not (a )?yc|^no\b|none/i]);
+    { const mk = membershipKind(L); if (mk === 'current') return null; if (mk === 'prospective') return joinAnswer(opts); }
     if (/entity type|legal entity|incorporat|c-?corp/.test(L)) return containsFact(opts, F('entityType'));
     if (/sales team|team size|how many people are/.test(L)) return null;
     if (/coming with a team|have a team|team status|looking for (a )?team/.test(L)) return pick(opts, [/looking|open|match|solo|no team/i]);
@@ -159,10 +202,9 @@
     if (/industr|sector|vertical|domain|space/.test(L)) return containsFact(opts, F('industry')) || pick(opts, [/\bai\b|artificial|machine learning|software|saas|\btech(nology)?\b/i, /other/i]);
     if (/(where|city|location|based|region).*(based|live|located|from|located|are you)|^location|^city|^where/.test(L)) return pick(opts, [REGION]);
     if (/stanford|berkeley|harvard|\bmit\b|universit|college|campus|alumn|\biit\b/.test(L)) return null;
-    // "+1 of a member?" / "(corporate VCs only)" gate on a role you probably do not hold.
+    // "(corporate VCs only)" gates on a role you probably do not hold. Membership questions
+    // ("+1 of a member?") never reach here; membershipKind() above sends them to the human.
     if (/\+\s?1 of|(corporate vcs?|investors?|lps?) only/.test(L)) return pick(opts, [/^no\b/i]);
-    // Never claim a membership. Prefer the honest non-member option; if the only options are yes/no, leave it for the human.
-    if (/member|associat|affiliat|alumni|part of/.test(L)) return pick(opts, [/not (yet |a )?member|non-?member|guest|^other|prospective/i]);
     if (/all that apply|check all|select all/.test(L)) { const o = pick(opts, [/^startup$/i, /founder/i, /^other/i]); if (o) return multiple ? [o] : o; }
     if (/best describes? (you|your role)|describes? you|describe yourself|which of these are you|who are you|^role|your role|title|what do you do|i am a|category|attending as|type of attendee|persona|profile/.test(L)) {
       const o = F('isFounder') ? pick(opts, [/^(founder|co-?founder|ceo|entrepreneur)\b/i, /founder|co-?founder|ceo|entrepreneur/i, /^startup$/i]) : null;
@@ -175,10 +217,11 @@
     if (/open to (new )?(roles|opportunit|jobs)|looking for (a )?(job|role|work)|job search|hiring status|actively looking/.test(L)) return pick(opts, [/^no\b|not (looking|open)|founder|not actively/i]);
     if (/evaluate|free trial|\bpoc\b|proof of concept|book a (demo|call)|sales (call|demo)/.test(L)) return POL('vendorDemos', false) ? pick(opts, [/^yes\b/i]) : pick(opts, [/^no\b|not (now|interested|at this time)|maybe later|just (here|attending)/i]);
     if (/roast|demo|pitch(ing)?( at| your)?|speak(er|ing)|sponsor|volunteer|present|showcase|perform|table|booth/.test(L)) return POL('speakOrPitch', false) ? pick(opts, [/^yes\b/i]) : pick(opts, [/^no\b|not (interested|now|this time)|just attend|attendee|no thanks/i]);
-    if (/interested in joining|join (our|the)|follow|subscribe|newsletter|updates|whatsapp|discord|slack|telegram|community|group|mailing/.test(L)) return POL('joinCommunities', true) ? pick(opts, [/^yes\b|sure|ok|count me in|maybe/i, /already|member|alum/i]) : pick(opts, [/^no\b|not now/i]);
+    if (/interested in joining|join (our|the)|follow|subscribe|newsletter|updates|whatsapp|discord|slack|telegram|community|group|mailing/.test(L)) return joinAnswer(opts);
     if (/\+\s?1|plus[- ]one|bringing a guest|bring a guest/.test(L)) return POL('bringGuest', false) ? pick(opts, [/^yes\b/i]) : pick(opts, [/^no\b/i]);
     if (/consent|agree|acknowledge|confirm|understand|accept|terms|photo|film|record|waiver|liability|code of conduct|commit|attend|rsvp|show up|will you/.test(L)) return POL('agreeToTerms', true) ? pick(opts, [/^yes\b|i agree|agree|accept|ok|confirm|i will|understand|acknowledg/i]) : null;
-    if (/ok!?$|got it|sounds good/i.test(opts.join('|')) && opts.length <= 2) return opts[0];
+    // Acknowledgement prompts: take the acknowledging option itself, not whichever comes first.
+    if (opts.length <= 2 && POL('agreeToTerms', true)) { const o = pick(opts, [/\bok(ay)?!?$|got it|sounds good/i]); if (o) return o; }
     if (/interest|topic|track|session|theme|excited|hope to|goal|want to/.test(L)) return pick(opts, [/\bai\b|founder|startup|network|meet|build|all of the above|all/i, /other/i]);
     if (/yes|no/i.test(opts.join('|')) && opts.length <= 3 && /would you like|do you want|are you interested|can we|may we/.test(L)) return pick(opts, [/^yes/i]);
     return null;
@@ -193,7 +236,14 @@
     if (/\bzip\b|postal/.test(L)) return P.zip || null;
     if (/instagram|\binsta\b/.test(L)) return P.instagram || null;
     if (/discord/.test(L) && /handle|username|user ?name|tag|id\b/.test(L)) return P.discord || null;
-    if (/y ?combinator|\byc\b batch|yc batch/.test(L)) return F('yc') ? (F('ycBatch') || null) : 'N/A — not a YC company';
+    if (/y ?combinator|\byc\b batch|yc batch/.test(L)) return F('yc') == null ? null : F('yc') ? (F('ycBatch') || null) : 'N/A — not a YC company';
+    {
+      // Recognized current-membership questions get no answer. The one exception is a bare
+      // employer field ("Professional affiliation"), which gets company and title below.
+      const mk = membershipKind(L);
+      if (mk === 'current' && !EMPLOYER_FIELD.test(plain(L).replace(/[\s:?*.]+$/, ''))) return null;
+      if (mk === 'prospective') return POL('joinCommunities', true) ? 'Yes' : 'No';
+    }
     if (/entity type|legal entity|incorporat/.test(L)) return F('entityType');
     if (/when did .*(round|raise).*(close)|round clos(e|ed)|date of (last|most recent) (round|raise)/.test(L)) return F('lastRoundDate');
     if (/^age\??$|your age|how old/.test(L)) return F('age') == null ? null : String(F('age'));
@@ -303,7 +353,13 @@
       else if (t === 'phone-number' || t === 'phone') v = P.phone || null; // E.164
       else if (t === 'email') v = P.email;
       else if (t === 'website') v = P.website || null;
-      else if (t === 'terms' || t === 'agree-check' || t === 'checkbox') { if (q.required && POL('agreeToTerms', true)) v = true; else if (!q.required) continue; }
+      else if (t === 'terms' || t === 'agree-check' || t === 'checkbox') {
+        // A checkbox that attests membership ("I confirm I am a current member") is a claim, not terms.
+        const mk = membershipKind(L);
+        const allowed = mk === 'current' ? false : mk === 'prospective' ? POL('joinCommunities', true) : POL('agreeToTerms', true);
+        if (!q.required) continue;
+        if (allowed) v = true;
+      }
       else if (t === 'select' || t === 'multi-select' || t === 'dropdown') { const o = ansOpt(L, q.options || [], q.multiple); if (o) v = Array.isArray(o) ? o : [o]; }
       else if (t === 'url') { v = ansText(L); if (v === null && !/instagram|code|zip/.test(L)) v = P.website || null; }
       else if (t === 'text' || t === 'long-text' || t === 'textarea' || t === 'number') { v = ansText(L); if (t === 'number' && v && !/^\d+$/.test(String(v))) v = null; }

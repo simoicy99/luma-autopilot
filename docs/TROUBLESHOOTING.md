@@ -88,5 +88,5 @@ the Mac asleep can leave a stale heartbeat; if you are sure nothing is running, 
 
 ## A registration was made in error
 
-It is reversible in the UI: open the event page, "Cancel registration" / "Leave waitlist",
-confirm. Then add the slug to `config.json`'s `skipSlugs`.
+You can usually cancel it in the UI: open the event page, "Cancel registration" / "Leave
+waitlist", confirm. Then add the slug to `config.json`'s `skipSlugs`.

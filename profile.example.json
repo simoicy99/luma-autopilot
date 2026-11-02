@@ -1,5 +1,5 @@
 {
-  "_comment": "Copy to profile.json and fill in. Every registration form answer comes from here. A null fact means 'I don't know' — questions that need it are left for you (NEEDS-HUMAN) instead of guessed.",
+  "_comment": "Copy to profile.json and fill in. Most registration form answers come from here. A null fact means 'I don't know': most rules then leave the question unanswered, so a required one becomes NEEDS-HUMAN, but some heuristic rules fall back to defaults (e.g. dietary picks a 'None' option). Review the dry run.",
 
   "email": "you@example.com",
   "first": "Ada",
